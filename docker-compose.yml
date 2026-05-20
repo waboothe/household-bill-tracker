@@ -1,0 +1,27 @@
+# Synology / docker-compose deployment for the Household Bill Tracker.
+#
+# Usage on the NAS:
+#   1. SSH in (or use Container Manager's "Project" UI in DSM 7.2+).
+#   2. git clone <your-repo> /volume1/docker/bill-tracker
+#   3. cd /volume1/docker/bill-tracker && docker compose up -d --build
+#   4. Browse to http://<nas-ip>:8123
+#
+# Port 8123 is arbitrary — change HOST_PORT below if it clashes with
+# Synology Photos, Surveillance Station, or another container.
+
+services:
+  bill-tracker:
+    build: .
+    image: bill-tracker:latest
+    container_name: bill-tracker
+    restart: unless-stopped
+    ports:
+      # host:container — only the left side needs editing for your NAS.
+      - "8123:80"
+    # No volumes needed — this is a pure static SPA. State lives in the
+    # browser. (Add a volume here later if you wire up persistence.)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
