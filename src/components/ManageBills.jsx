@@ -1,19 +1,24 @@
 import { useState } from 'react';
-import { Plus, Trash2, Zap, Repeat, X } from 'lucide-react';
+import { Plus, Trash2, Zap, Repeat, X, Pencil } from 'lucide-react';
 import { FREQUENCIES } from '../data/seed.js';
 import { formatCurrency } from '../data/calc.js';
 
 export default function ManageBills({ bills, onAddBill, onUpdateBill, onRemoveBill }) {
-  const [modalOpen, setModalOpen] = useState(false);
+  // null = closed | 'new' = adding | bill object = editing that bill
+  const [editing, setEditing] = useState(null);
+
+  const handleSave = (formData) => {
+    if (editing === 'new') onAddBill(formData);
+    else onUpdateBill(editing.id, formData);
+    setEditing(null);
+  };
 
   return (
     <div className="flex flex-col gap-4 py-3 pb-4">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-ink-400">{bills.length} bills registered</p>
-        </div>
+        <p className="text-xs text-ink-400">{bills.length} bills registered</p>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => setEditing('new')}
           className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-card transition"
         >
           <Plus size={16} /> Add New Bill
@@ -26,15 +31,17 @@ export default function ManageBills({ bills, onAddBill, onUpdateBill, onRemoveBi
             key={bill.id}
             bill={bill}
             onUpdate={(patch) => onUpdateBill(bill.id, patch)}
+            onEdit={() => setEditing(bill)}
             onRemove={() => onRemoveBill(bill.id)}
           />
         ))}
       </ul>
 
-      {modalOpen && (
-        <AddBillModal
-          onClose={() => setModalOpen(false)}
-          onSave={(bill) => { onAddBill(bill); setModalOpen(false); }}
+      {editing && (
+        <BillFormModal
+          bill={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSave={handleSave}
         />
       )}
     </div>
@@ -43,7 +50,7 @@ export default function ManageBills({ bills, onAddBill, onUpdateBill, onRemoveBi
 
 /* ---------- Card for each registered bill ---------- */
 
-function BillCard({ bill, onUpdate, onRemove }) {
+function BillCard({ bill, onUpdate, onEdit, onRemove }) {
   const dueLabel =
     bill.frequency === 'Yearly'
       ? new Date(bill.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -51,21 +58,22 @@ function BillCard({ bill, onUpdate, onRemove }) {
 
   return (
     <li className="bg-white rounded-2xl p-3 shadow-card">
-      <div className="flex items-start justify-between gap-2">
+      <button
+        type="button"
+        onClick={onEdit}
+        className="w-full flex items-start justify-between gap-2 text-left group"
+        aria-label={`Edit ${bill.name}`}
+      >
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-900 truncate">{bill.name}</p>
           <p className="text-[11px] text-ink-400 mt-0.5">
             {bill.frequency} · {dueLabel} · {formatCurrency(bill.amount, { cents: true })}
           </p>
         </div>
-        <button
-          onClick={onRemove}
-          className="text-ink-400 hover:text-rose-600 p-1.5 rounded-full hover:bg-rose-50 transition"
-          aria-label={`Delete ${bill.name}`}
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
+        <span className="text-ink-400 group-hover:text-indigo-600 transition shrink-0">
+          <Pencil size={15} />
+        </span>
+      </button>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
         <Toggle
@@ -80,6 +88,13 @@ function BillCard({ bill, onUpdate, onRemove }) {
           Icon={Repeat}
           label="Variable"
         />
+        <button
+          onClick={onRemove}
+          className="ml-auto text-ink-400 hover:text-rose-600 p-1.5 rounded-full hover:bg-rose-50 transition"
+          aria-label={`Delete ${bill.name}`}
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </li>
   );
@@ -98,9 +113,7 @@ function Toggle({ on, onChange, Icon, label }) {
       <Icon size={12} />
       {label}
       <span
-        className={`ml-0.5 h-3 w-5 rounded-full transition ${
-          on ? 'bg-emerald-500' : 'bg-ink-300'
-        } relative`}
+        className={`ml-0.5 h-3 w-5 rounded-full transition relative ${on ? 'bg-emerald-500' : 'bg-ink-300'}`}
       >
         <span
           className={`absolute top-0.5 h-2 w-2 rounded-full bg-white transition-transform ${
@@ -112,19 +125,21 @@ function Toggle({ on, onChange, Icon, label }) {
   );
 }
 
+/* ---------- Add / Edit Bill Modal (one modal to rule them all) ---------- */
 
-/* ---------- Add Bill Modal ---------- */
+function BillFormModal({ bill, onClose, onSave }) {
+  const isEdit = Boolean(bill);
 
-function AddBillModal({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: '',
-    frequency: 'Monthly',
-    dueDay: 1,
-    dueDate: new Date().toISOString().slice(0, 10),
-    autoPay: false,
-    variable: false,
-    amount: '',
-  });
+  // Seed form from the existing bill (when editing) or defaults (when adding).
+  const [form, setForm] = useState(() => ({
+    name: bill?.name ?? '',
+    frequency: bill?.frequency ?? 'Monthly',
+    dueDay: bill?.dueDay ?? 1,
+    dueDate: bill?.dueDate ?? new Date().toISOString().slice(0, 10),
+    autoPay: bill?.autoPay ?? false,
+    variable: bill?.variable ?? false,
+    amount: bill?.amount ?? '',
+  }));
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -157,7 +172,7 @@ function AddBillModal({ onClose, onSave }) {
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
         <header className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-ink-900">New bill</h2>
+          <h2 className="text-lg font-bold text-ink-900">{isEdit ? 'Edit bill' : 'New bill'}</h2>
           <button type="button" onClick={onClose} className="p-1.5 rounded-full hover:bg-ink-100 text-ink-400" aria-label="Close">
             <X size={18} />
           </button>
@@ -231,7 +246,7 @@ function AddBillModal({ onClose, onSave }) {
           type="submit"
           className="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-card transition"
         >
-          Save bill
+          {isEdit ? 'Save changes' : 'Save bill'}
         </button>
 
         <style>{`
