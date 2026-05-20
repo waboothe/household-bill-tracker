@@ -55,22 +55,32 @@ export function expectedAmount(bill) {
 export function projectedMonthlyTotals(bills, year) {
   const totals = Array(12).fill(0);
   for (const b of bills) {
-    const fallback = expectedAmount(b);
-    if (b.frequency === 'Monthly') {
-      for (let m = 0; m < 12; m++) {
-        const key = `${year}-${String(m + 1).padStart(2, '0')}`;
-        const override = b.variable ? b.variableAmounts?.[key] : null;
-        totals[m] += override != null ? Number(override) : fallback;
-      }
-    } else if (b.frequency === 'Quarterly') {
-      [0, 3, 6, 9].forEach((m) => { totals[m] += fallback; });
-    } else if (b.frequency === 'Yearly') {
-      const dt = b.dueDate ? new Date(b.dueDate) : null;
-      const m = dt ? dt.getUTCMonth() : 0;
-      totals[m] += fallback;
-    }
+    const perMonth = monthsForBill(b, year);
+    for (let m = 0; m < 12; m++) totals[m] += perMonth[m];
   }
   return totals;
+}
+
+// Per-bill 12-month projection — same rules as projectedMonthlyTotals but
+// not aggregated. Pure + reused so the dashboard total and the per-bill
+// chart can never disagree.
+export function monthsForBill(bill, year) {
+  const months = Array(12).fill(0);
+  const fallback = expectedAmount(bill);
+  if (bill.frequency === 'Monthly') {
+    for (let m = 0; m < 12; m++) {
+      const key = `${year}-${String(m + 1).padStart(2, '0')}`;
+      const override = bill.variable ? bill.variableAmounts?.[key] : null;
+      months[m] = override != null ? Number(override) : fallback;
+    }
+  } else if (bill.frequency === 'Quarterly') {
+    [0, 3, 6, 9].forEach((m) => { months[m] = fallback; });
+  } else if (bill.frequency === 'Yearly') {
+    const dt = bill.dueDate ? new Date(bill.dueDate) : null;
+    const m = dt ? dt.getUTCMonth() : 0;
+    months[m] = fallback;
+  }
+  return months;
 }
 
 // Helper: get bills due in the given month (0-11) for the given year.

@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
-import { ShieldCheck, AlertTriangle, ShieldAlert, Pencil, Check, Sparkles, TrendingUp } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ShieldAlert, Pencil, Check, Sparkles, TrendingUp, Layers } from 'lucide-react';
 import {
-  averageMonthly, biweeklyRequired, depositStatus, formatCurrency,
-  MONTHS_SHORT, nextSpikeMonth, projectedMonthlyTotals, totalAnnual,
+  annualCost, averageMonthly, biweeklyRequired, depositStatus, formatCurrency,
+  monthsForBill, MONTHS_SHORT, nextSpikeMonth, projectedMonthlyTotals, totalAnnual,
 } from '../data/calc.js';
 
 const STATUS_THEME = {
@@ -73,6 +73,8 @@ export default function Dashboard({ bills, lockedDeposit, onLockedDepositChange,
       <SummaryRow annual={annual} avgMonthly={avgMonthly} biweekly={biweekly} />
 
       <ComparisonChartCard chartData={chartData} />
+
+      <BillBreakdownCard bills={bills} year={year} />
     </div>
   );
 }
@@ -305,6 +307,130 @@ function ComparisonChartCard({ chartData }) {
               dot={{ r: 3, fill: '#4f46e5' }}
               activeDot={{ r: 5 }}
             />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Per-Bill Breakdown Chart ---------- */
+
+// A small, curated palette — distinct hues that read well on white and
+// cycle gracefully for households with > 12 bills.
+const LINE_PALETTE = [
+  '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#06b6d4',
+  '#8b5cf6', '#ec4899', '#22c55e', '#f97316', '#0ea5e9',
+  '#a855f7', '#84cc16',
+];
+
+function BillBreakdownCard({ bills, year }) {
+  // Sort bills by total annual spend (biggest = most informative line first).
+  const series = useMemo(() => {
+    return bills
+      .map((b, idx) => ({
+        id: b.id,
+        name: b.name,
+        color: LINE_PALETTE[idx % LINE_PALETTE.length],
+        months: monthsForBill(b, year),
+        annual: annualCost(b),
+      }))
+      .sort((a, b) => b.annual - a.annual);
+  }, [bills, year]);
+
+  // Default visible set: top 5 by spend. Keeps the chart legible on first
+  // glance; user can tap any chip to toggle.
+  const [hidden, setHidden] = useState(() => new Set(series.slice(5).map((s) => s.id)));
+  const toggle = (id) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const chartData = useMemo(
+    () => MONTHS_SHORT.map((m, i) => {
+      const row = { month: m };
+      for (const s of series) row[s.id] = Math.round(s.months[i]);
+      return row;
+    }),
+    [series],
+  );
+
+  return (
+    <section className="bg-white rounded-2xl p-4 shadow-card" aria-label="Per-bill spend breakdown">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-sm font-bold text-ink-900 flex items-center gap-1.5">
+            <Layers size={16} className="text-indigo-600" />
+            Spend by bill
+          </h2>
+          <p className="text-[11px] text-ink-400">Tap a chip to toggle a line</p>
+        </div>
+      </div>
+
+      {/* Chip legend — doubles as the visibility toggle */}
+      <ul className="flex flex-wrap gap-1.5 mb-3">
+        {series.map((s) => {
+          const off = hidden.has(s.id);
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => toggle(s.id)}
+                aria-pressed={!off}
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-semibold transition ${
+                  off
+                    ? 'bg-ink-100 text-ink-400 line-through'
+                    : 'bg-ink-100 text-ink-800 hover:bg-ink-200'
+                }`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: off ? '#cbd5e1' : s.color }}
+                />
+                {s.name}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="h-60">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+            />
+            <Tooltip
+              formatter={(v, key) => [formatCurrency(v), series.find((s) => s.id === key)?.name ?? key]}
+              contentStyle={{
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                fontSize: 12,
+                boxShadow: '0 8px 24px -12px rgb(15 23 42 / 0.18)',
+              }}
+            />
+            {series
+              .filter((s) => !hidden.has(s.id))
+              .map((s) => (
+                <Line
+                  key={s.id}
+                  type="monotone"
+                  dataKey={s.id}
+                  name={s.name}
+                  stroke={s.color}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                  isAnimationActive={false}
+                />
+              ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
