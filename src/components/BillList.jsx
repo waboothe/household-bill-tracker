@@ -1,28 +1,15 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, Check, History, Zap, User, Users, Heart } from 'lucide-react';
+import { AlertCircle, Check, History, Zap } from 'lucide-react';
 import { billsDueInMonth, formatCurrency, monthKey } from '../data/calc.js';
 
-const FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'You', label: 'My Bills' },
-  { id: "Spouse", label: "Spouse's" },
-];
-
 export default function BillList({ bills, onSetVariableAmount, onTogglePaid }) {
-  const [filter, setFilter] = useState('all');
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const today = now.getDate();
   const mKey = monthKey(now);
 
-  const dueThisMonth = useMemo(() => billsDueInMonth(bills, year, month), [bills, year, month]);
-
-  // Apply the owner filter ("All" keeps Joint visible everywhere).
-  const filtered = useMemo(() => {
-    if (filter === 'all') return dueThisMonth;
-    return dueThisMonth.filter(({ bill }) => bill.assignedTo === filter || bill.assignedTo === 'Joint');
-  }, [dueThisMonth, filter]);
+  const filtered = useMemo(() => billsDueInMonth(bills, year, month), [bills, year, month]);
 
   // Classify each due bill into one of three buckets.
   const overdue = [];
@@ -56,25 +43,6 @@ export default function BillList({ bills, onSetVariableAmount, onTogglePaid }) {
   return (
     <div className="flex flex-col gap-4 py-3">
       <ProgressBar settled={settledCount} total={totalCount} />
-
-      <div role="tablist" aria-label="Filter bills" className="flex gap-1.5 p-1 bg-white rounded-full shadow-card">
-        {FILTERS.map((f) => {
-          const active = filter === f.id;
-          return (
-            <button
-              key={f.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setFilter(f.id)}
-              className={`flex-1 text-xs font-semibold py-2 rounded-full transition ${
-                active ? 'bg-ink-900 text-white shadow' : 'text-ink-600 hover:bg-ink-100'
-              }`}
-            >
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
 
       <Section
         title="Overdue"
@@ -180,21 +148,6 @@ function Section({ title, emoji, accent, items, emptyMsg, muted, children }) {
   );
 }
 
-function OwnerBadge({ owner }) {
-  const map = {
-    You: { Icon: User, cls: 'bg-indigo-100 text-indigo-700' },
-    Spouse: { Icon: Heart, cls: 'bg-pink-100 text-pink-700' },
-    Joint: { Icon: Users, cls: 'bg-violet-100 text-violet-700' },
-  };
-  const { Icon, cls } = map[owner] || map.Joint;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${cls}`}>
-      <Icon size={10} />
-      {owner}
-    </span>
-  );
-}
-
 function BillRow({ entry, tone, mKey, actionSlot }) {
   const { bill, dueDateObj, isPaid } = entry;
   return (
@@ -209,7 +162,6 @@ function BillRow({ entry, tone, mKey, actionSlot }) {
               <Zap size={10} /> Auto
             </span>
           )}
-          <OwnerBadge owner={bill.assignedTo} />
         </div>
         <p className="text-[11px] text-ink-400 mt-0.5">
           Due {dueDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -246,10 +198,7 @@ function PendingVariableRow({ entry, mKey, onSetVariableAmount }) {
     <li className="bg-white rounded-xl p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-ink-900 truncate">{bill.name}</p>
-            <OwnerBadge owner={bill.assignedTo} />
-          </div>
+          <p className="text-sm font-semibold text-ink-900 truncate">{bill.name}</p>
           <p className="text-[11px] text-ink-400 mt-0.5 flex items-center gap-1">
             <AlertCircle size={11} className="text-amber-500" />
             Variable · enter this month's bill

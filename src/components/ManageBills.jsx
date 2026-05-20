@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Plus, Trash2, Zap, Repeat, User, Heart, Users, X } from 'lucide-react';
-import { FREQUENCIES, OWNERS } from '../data/seed.js';
+import { Plus, Trash2, Zap, Repeat, X } from 'lucide-react';
+import { FREQUENCIES } from '../data/seed.js';
 import { formatCurrency } from '../data/calc.js';
 
 export default function ManageBills({ bills, onAddBill, onUpdateBill, onRemoveBill }) {
@@ -80,7 +80,6 @@ function BillCard({ bill, onUpdate, onRemove }) {
           Icon={Repeat}
           label="Variable"
         />
-        <OwnerPill owner={bill.assignedTo} onChange={(v) => onUpdate({ assignedTo: v })} />
       </div>
     </li>
   );
@@ -113,28 +112,6 @@ function Toggle({ on, onChange, Icon, label }) {
   );
 }
 
-function OwnerPill({ owner, onChange }) {
-  const map = {
-    You: { Icon: User, cls: 'bg-indigo-100 text-indigo-700' },
-    Spouse: { Icon: Heart, cls: 'bg-pink-100 text-pink-700' },
-    Joint: { Icon: Users, cls: 'bg-violet-100 text-violet-700' },
-  };
-  const { Icon, cls } = map[owner] || map.Joint;
-  return (
-    <label className={`relative inline-flex items-center gap-1 px-2 py-1 rounded-full font-semibold ${cls}`}>
-      <Icon size={12} />
-      <span>{owner}</span>
-      <select
-        value={owner}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-        aria-label="Assigned to"
-      >
-        {OWNERS.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </label>
-  );
-}
 
 /* ---------- Add Bill Modal ---------- */
 
@@ -146,7 +123,6 @@ function AddBillModal({ onClose, onSave }) {
     dueDate: new Date().toISOString().slice(0, 10),
     autoPay: false,
     variable: false,
-    assignedTo: 'Joint',
     amount: '',
   });
 
@@ -160,7 +136,6 @@ function AddBillModal({ onClose, onSave }) {
       frequency: form.frequency,
       autoPay: form.autoPay,
       variable: form.variable,
-      assignedTo: form.assignedTo,
       amount: Number(form.amount),
     };
     onSave(
@@ -244,16 +219,6 @@ function AddBillModal({ onClose, onSave }) {
               placeholder="0.00"
               className="input"
             />
-          </Field>
-
-          <Field label="Assigned to">
-            <select
-              value={form.assignedTo}
-              onChange={(e) => set({ assignedTo: e.target.value })}
-              className="input"
-            >
-              {OWNERS.map((o) => <option key={o}>{o}</option>)}
-            </select>
           </Field>
 
           <div className="flex items-center justify-between gap-3 mt-1">

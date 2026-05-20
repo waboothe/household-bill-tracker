@@ -3,7 +3,6 @@
 // Bills are stored in their NATIVE frequency; everything is normalized
 // to "annual" at calculation time (see src/data/calc.js).
 
-export const OWNERS = ['You', 'Spouse', 'Joint'];
 export const FREQUENCIES = ['Monthly', 'Quarterly', 'Yearly'];
 
 // Locked direct deposit (per paycheck, biweekly). User edits once per year.
@@ -24,7 +23,6 @@ export const SEED_BILLS = [
     dueDay: 1,
     autoPay: true,
     variable: false,
-    assignedTo: 'Joint',
     amount: 2150,
     variableAmounts: {},
     paidMonths: [],
@@ -36,7 +34,6 @@ export const SEED_BILLS = [
     dueDay: 15,
     autoPay: false,
     variable: true,
-    assignedTo: 'You',
     amount: 145, // placeholder average
     variableAmounts: {},
     paidMonths: [],
@@ -48,7 +45,6 @@ export const SEED_BILLS = [
     dueDay: 12,
     autoPay: false,
     variable: true,
-    assignedTo: 'Spouse',
     amount: 60,
     variableAmounts: {},
     paidMonths: [],
@@ -60,7 +56,6 @@ export const SEED_BILLS = [
     dueDay: 5,
     autoPay: true,
     variable: false,
-    assignedTo: 'You',
     amount: 79,
     variableAmounts: {},
     paidMonths: [],
@@ -72,7 +67,6 @@ export const SEED_BILLS = [
     dueDay: 20,
     autoPay: false,
     variable: false,
-    assignedTo: 'Joint',
     amount: 210,
     variableAmounts: {},
     paidMonths: [],
@@ -84,7 +78,6 @@ export const SEED_BILLS = [
     dueDay: 22,
     autoPay: true,
     variable: false,
-    assignedTo: 'Spouse',
     amount: 38,
     variableAmounts: {},
     paidMonths: [],
@@ -96,7 +89,6 @@ export const SEED_BILLS = [
     dueDay: 8,
     autoPay: true,
     variable: false,
-    assignedTo: 'Joint',
     amount: 165,
     variableAmounts: {},
     paidMonths: [],
@@ -108,7 +100,6 @@ export const SEED_BILLS = [
     dueDay: 18,
     autoPay: true,
     variable: false,
-    assignedTo: 'Joint',
     amount: 685,
     variableAmounts: {},
     paidMonths: [],
@@ -120,7 +111,6 @@ export const SEED_BILLS = [
     dueDate: '2026-09-01',
     autoPay: false,
     variable: false,
-    assignedTo: 'You',
     amount: 1850,
     variableAmounts: {},
     paidMonths: [],
@@ -132,7 +122,6 @@ export const SEED_BILLS = [
     dueDate: '2026-11-15',
     autoPay: false,
     variable: false,
-    assignedTo: 'Joint',
     amount: 5400,
     variableAmounts: {},
     paidMonths: [],
@@ -144,7 +133,6 @@ export const SEED_BILLS = [
     dueDay: 1,
     autoPay: true,
     variable: false,
-    assignedTo: 'Joint',
     amount: 295,
     variableAmounts: {},
     paidMonths: [],
@@ -156,7 +144,6 @@ export const SEED_BILLS = [
     dueDay: 3,
     autoPay: true,
     variable: false,
-    assignedTo: 'Spouse',
     amount: 45,
     variableAmounts: {},
     paidMonths: [],
