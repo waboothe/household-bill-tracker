@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { LayoutDashboard, ListChecks, Settings2 } from 'lucide-react';
 import Dashboard from './components/Dashboard.jsx';
 import BillList from './components/BillList.jsx';
 import ManageBills from './components/ManageBills.jsx';
-import { SEED_BILLS, DEFAULT_LOCKED_DEPOSIT, LAST_YEAR_MONTHLY } from './data/seed.js';
+import { SEED_BILLS, DEFAULT_LOCKED_DEPOSIT } from './data/seed.js';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -15,9 +15,6 @@ export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [bills, setBills] = useState(SEED_BILLS);
   const [lockedDeposit, setLockedDeposit] = useState(DEFAULT_LOCKED_DEPOSIT);
-
-  // Memoize the immutable last-year array so chart props are stable.
-  const lastYear = useMemo(() => LAST_YEAR_MONTHLY, []);
 
   // Single source of truth for mutating a bill — every component edits via
   // these helpers so we don't sprinkle setBills logic across the tree.
@@ -68,7 +65,6 @@ export default function App() {
               bills={bills}
               lockedDeposit={lockedDeposit}
               onLockedDepositChange={setLockedDeposit}
-              lastYear={lastYear}
             />
           )}
           {tab === 'bills' && (

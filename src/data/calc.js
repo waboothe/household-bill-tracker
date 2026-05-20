@@ -83,6 +83,24 @@ export function monthsForBill(bill, year) {
   return months;
 }
 
+// Pull the per-bill last-year array, padded/normalized to 12 numbers so
+// downstream chart code never has to defend against undefined indices.
+export function lastYearMonthsForBill(bill) {
+  const src = bill.lastYearMonths || [];
+  return Array.from({ length: 12 }, (_, i) => Number(src[i]) || 0);
+}
+
+// Aggregate last-year totals across every bill — the dashed line on the
+// year-over-year comparison chart.
+export function lastYearMonthlyTotals(bills) {
+  const totals = Array(12).fill(0);
+  for (const b of bills) {
+    const arr = lastYearMonthsForBill(b);
+    for (let m = 0; m < 12; m++) totals[m] += arr[m];
+  }
+  return totals;
+}
+
 // Helper: get bills due in the given month (0-11) for the given year.
 // Each result is { bill, dueDateObj } so downstream code can sort/show.
 export function billsDueInMonth(bills, year, month) {

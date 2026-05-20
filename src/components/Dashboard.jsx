@@ -5,6 +5,7 @@ import {
 import { ShieldCheck, AlertTriangle, ShieldAlert, Pencil, Check, Sparkles, TrendingUp, Layers } from 'lucide-react';
 import {
   annualCost, averageMonthly, biweeklyRequired, depositStatus, formatCurrency,
+  lastYearMonthlyTotals, lastYearMonthsForBill,
   monthsForBill, MONTHS_SHORT, nextSpikeMonth, projectedMonthlyTotals, totalAnnual,
 } from '../data/calc.js';
 
@@ -35,7 +36,7 @@ const STATUS_THEME = {
   },
 };
 
-export default function Dashboard({ bills, lockedDeposit, onLockedDepositChange, lastYear }) {
+export default function Dashboard({ bills, lockedDeposit, onLockedDepositChange }) {
   const year = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
 
@@ -43,6 +44,7 @@ export default function Dashboard({ bills, lockedDeposit, onLockedDepositChange,
   const biweekly = useMemo(() => biweeklyRequired(bills), [bills]);
   const avgMonthly = useMemo(() => averageMonthly(bills), [bills]);
   const monthlyTotals = useMemo(() => projectedMonthlyTotals(bills, year), [bills, year]);
+  const lastYear = useMemo(() => lastYearMonthlyTotals(bills), [bills]);
   const status = depositStatus(lockedDeposit, biweekly);
 
   const spike = useMemo(
@@ -333,6 +335,7 @@ function BillBreakdownCard({ bills, year }) {
         name: b.name,
         color: LINE_PALETTE[idx % LINE_PALETTE.length],
         months: monthsForBill(b, year),
+        prior: lastYearMonthsForBill(b),
         annual: annualCost(b),
       }))
       .sort((a, b) => b.annual - a.annual);
@@ -341,6 +344,7 @@ function BillBreakdownCard({ bills, year }) {
   // Default visible set: top 5 by spend. Keeps the chart legible on first
   // glance; user can tap any chip to toggle.
   const [hidden, setHidden] = useState(() => new Set(series.slice(5).map((s) => s.id)));
+  const [showPrior, setShowPrior] = useState(false);
   const toggle = (id) =>
     setHidden((prev) => {
       const next = new Set(prev);
@@ -351,15 +355,25 @@ function BillBreakdownCard({ bills, year }) {
   const chartData = useMemo(
     () => MONTHS_SHORT.map((m, i) => {
       const row = { month: m };
-      for (const s of series) row[s.id] = Math.round(s.months[i]);
+      for (const s of series) {
+        row[s.id] = Math.round(s.months[i]);
+        row[`${s.id}__prior`] = Math.round(s.prior[i]);
+      }
       return row;
     }),
     [series],
   );
 
+  const labelFor = (key) => {
+    const isPrior = key.endsWith('__prior');
+    const id = isPrior ? key.slice(0, -'__prior'.length) : key;
+    const name = series.find((s) => s.id === id)?.name ?? key;
+    return isPrior ? `${name} (last yr)` : name;
+  };
+
   return (
     <section className="bg-white rounded-2xl p-4 shadow-card" aria-label="Per-bill spend breakdown">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-start justify-between mb-3 gap-3">
         <div>
           <h2 className="text-sm font-bold text-ink-900 flex items-center gap-1.5">
             <Layers size={16} className="text-indigo-600" />
@@ -367,6 +381,21 @@ function BillBreakdownCard({ bills, year }) {
           </h2>
           <p className="text-[11px] text-ink-400">Tap a chip to toggle a line</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowPrior((v) => !v)}
+          aria-pressed={showPrior}
+          className={`shrink-0 text-[11px] font-semibold px-2.5 py-1.5 rounded-full transition inline-flex items-center gap-1.5 ${
+            showPrior
+              ? 'bg-indigo-600 text-white'
+              : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
+          }`}
+        >
+          <span
+            className={`h-0.5 w-3 rounded ${showPrior ? 'border-t-2 border-dashed border-white' : 'border-t-2 border-dashed border-ink-400'}`}
+          />
+          Last year
+        </button>
       </div>
 
       {/* Chip legend — doubles as the visibility toggle */}
@@ -408,7 +437,7 @@ function BillBreakdownCard({ bills, year }) {
               tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
             />
             <Tooltip
-              formatter={(v, key) => [formatCurrency(v), series.find((s) => s.id === key)?.name ?? key]}
+              formatter={(v, key) => [formatCurrency(v), labelFor(key)]}
               contentStyle={{
                 borderRadius: 12,
                 border: '1px solid #e2e8f0',
@@ -418,19 +447,38 @@ function BillBreakdownCard({ bills, year }) {
             />
             {series
               .filter((s) => !hidden.has(s.id))
-              .map((s) => (
-                <Line
-                  key={s.id}
-                  type="monotone"
-                  dataKey={s.id}
-                  name={s.name}
-                  stroke={s.color}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                  isAnimationActive={false}
-                />
-              ))}
+              .flatMap((s) => {
+                const lines = [
+                  <Line
+                    key={s.id}
+                    type="monotone"
+                    dataKey={s.id}
+                    name={s.name}
+                    stroke={s.color}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                    isAnimationActive={false}
+                  />,
+                ];
+                if (showPrior) {
+                  lines.push(
+                    <Line
+                      key={`${s.id}__prior`}
+                      type="monotone"
+                      dataKey={`${s.id}__prior`}
+                      name={`${s.name} (last yr)`}
+                      stroke={s.color}
+                      strokeOpacity={0.65}
+                      strokeWidth={1.5}
+                      strokeDasharray="5 4"
+                      dot={false}
+                      isAnimationActive={false}
+                    />,
+                  );
+                }
+                return lines;
+              })}
           </LineChart>
         </ResponsiveContainer>
       </div>
