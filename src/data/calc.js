@@ -9,7 +9,7 @@ export const MONTHS_SHORT = [
 export const FREQ_MULTIPLIER = { Monthly: 12, Quarterly: 4, Yearly: 1 };
 
 export function annualCost(bill) {
-  return (Number(bill.amount) || 0) * FREQ_MULTIPLIER[bill.frequency];
+  return expectedAmount(bill) * FREQ_MULTIPLIER[bill.frequency];
 }
 
 export function totalAnnual(bills) {
@@ -33,6 +33,20 @@ export function depositStatus(lockedDeposit, biweekly) {
   return 'SAFE';
 }
 
+// The "best guess" charge for a variable bill in a month we haven't logged.
+// Prefers the running average of every month we *have* logged this year,
+// falling back to the user's stored placeholder (typically prior-year avg)
+// when nothing has been entered yet.
+export function expectedAmount(bill) {
+  const placeholder = Number(bill.amount) || 0;
+  if (!bill.variable) return placeholder;
+  const entries = Object.values(bill.variableAmounts || {})
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (entries.length === 0) return placeholder;
+  return entries.reduce((a, b) => a + b, 0) / entries.length;
+}
+
 // Returns expected charges for each month (0-11) of the current year for
 // the given bills list, treating variableAmounts overrides where present.
 // - Monthly: contributes every month on dueDay.
@@ -41,19 +55,19 @@ export function depositStatus(lockedDeposit, biweekly) {
 export function projectedMonthlyTotals(bills, year) {
   const totals = Array(12).fill(0);
   for (const b of bills) {
-    const baseAmt = Number(b.amount) || 0;
+    const fallback = expectedAmount(b);
     if (b.frequency === 'Monthly') {
       for (let m = 0; m < 12; m++) {
         const key = `${year}-${String(m + 1).padStart(2, '0')}`;
         const override = b.variable ? b.variableAmounts?.[key] : null;
-        totals[m] += override != null ? Number(override) : baseAmt;
+        totals[m] += override != null ? Number(override) : fallback;
       }
     } else if (b.frequency === 'Quarterly') {
-      [0, 3, 6, 9].forEach((m) => { totals[m] += baseAmt; });
+      [0, 3, 6, 9].forEach((m) => { totals[m] += fallback; });
     } else if (b.frequency === 'Yearly') {
       const dt = b.dueDate ? new Date(b.dueDate) : null;
       const m = dt ? dt.getUTCMonth() : 0;
-      totals[m] += baseAmt;
+      totals[m] += fallback;
     }
   }
   return totals;

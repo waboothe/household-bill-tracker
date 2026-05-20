@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, Check, History, Zap } from 'lucide-react';
-import { billsDueInMonth, formatCurrency, monthKey } from '../data/calc.js';
+import { billsDueInMonth, expectedAmount, formatCurrency, monthKey } from '../data/calc.js';
 
 export default function BillList({ bills, onSetVariableAmount, onTogglePaid }) {
   const now = new Date();
@@ -171,7 +171,7 @@ function BillRow({ entry, tone, mKey, actionSlot }) {
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <p className={`text-sm font-bold ${tone === 'rose' ? 'text-rose-700' : 'text-ink-900'}`}>
-          {formatCurrency(bill.variable ? (bill.variableAmounts?.[mKey] ?? bill.amount) : bill.amount, { cents: true })}
+          {formatCurrency(bill.variable ? (bill.variableAmounts?.[mKey] ?? expectedAmount(bill)) : bill.amount, { cents: true })}
         </p>
         {actionSlot}
       </div>
@@ -181,11 +181,17 @@ function BillRow({ entry, tone, mKey, actionSlot }) {
 
 function PendingVariableRow({ entry, mKey, onSetVariableAmount }) {
   const { bill, dueDateObj } = entry;
-  // Last month's stored value (or fall back to the placeholder amount).
+  // Smart fallback chain:
+  //   1. Last month's logged value ("Use last month" intent)
+  //   2. Running average of every month we've already logged
+  //   3. The placeholder "prior year average" set when adding the bill
   const [year, month] = mKey.split('-').map(Number);
-  const lastMonth = new Date(year, month - 2, 1); // month is 1-indexed in key
+  const lastMonth = new Date(year, month - 2, 1); // month in key is 1-indexed
   const lastKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
-  const lastValue = bill.variableAmounts?.[lastKey] ?? bill.amount;
+  const avgValue = expectedAmount(bill); // running avg → placeholder fallback
+  const lastValue = bill.variableAmounts?.[lastKey] ?? avgValue;
+  const hasPriorYearData = (Number(bill.amount) || 0) > 0;
+  const hintLabel = hasPriorYearData ? 'avg' : 'monthly avg';
   const [draft, setDraft] = useState('');
 
   const save = (value) => {
@@ -212,7 +218,7 @@ function PendingVariableRow({ entry, mKey, onSetVariableAmount }) {
           <input
             type="number"
             inputMode="decimal"
-            placeholder={`Enter $ (avg ${lastValue})`}
+            placeholder={`Enter $ (${hintLabel} ${formatCurrency(avgValue, { cents: false })})`}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && save(draft)}

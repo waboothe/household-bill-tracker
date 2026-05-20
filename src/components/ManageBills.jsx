@@ -145,13 +145,17 @@ function BillFormModal({ bill, onClose, onSave }) {
 
   const submit = (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !(Number(form.amount) > 0)) return;
+    if (!form.name.trim()) return;
+    // Variable bills can be saved without an amount — we'll learn the
+    // average from monthly entries. Fixed bills still require one.
+    const amt = Number(form.amount) || 0;
+    if (!form.variable && !(amt > 0)) return;
     const base = {
       name: form.name.trim(),
       frequency: form.frequency,
       autoPay: form.autoPay,
       variable: form.variable,
-      amount: Number(form.amount),
+      amount: amt,
     };
     onSave(
       form.frequency === 'Yearly'
@@ -223,7 +227,13 @@ function BillFormModal({ bill, onClose, onSave }) {
             )}
           </div>
 
-          <Field label={form.variable ? 'Last year average ($)' : 'Amount ($)'}>
+          <Field
+            label={
+              form.variable
+                ? 'Prior-year average ($) — optional'
+                : 'Amount ($)'
+            }
+          >
             <input
               type="number"
               inputMode="decimal"
@@ -231,7 +241,7 @@ function BillFormModal({ bill, onClose, onSave }) {
               step="0.01"
               value={form.amount}
               onChange={(e) => set({ amount: e.target.value })}
-              placeholder="0.00"
+              placeholder={form.variable ? 'Leave blank — we\u2019ll average as you log' : '0.00'}
               className="input"
             />
           </Field>
