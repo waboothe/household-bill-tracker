@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LayoutDashboard, ListChecks, Settings2 } from 'lucide-react';
 import Dashboard from './components/Dashboard.jsx';
 import BillList from './components/BillList.jsx';
 import ManageBills from './components/ManageBills.jsx';
-import { SEED_BILLS, DEFAULT_LOCKED_DEPOSIT } from './data/seed.js';
+import { api } from './data/api.js';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -13,46 +13,63 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('dashboard');
-  const [bills, setBills] = useState(SEED_BILLS);
-  const [lockedDeposit, setLockedDeposit] = useState(DEFAULT_LOCKED_DEPOSIT);
+  const [bills, setBills] = useState([]);
+  const [lockedDeposit, setLockedDeposit] = useState(0);
+  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [error, setError] = useState(null);
 
-  // Single source of truth for mutating a bill — every component edits via
-  // these helpers so we don't sprinkle setBills logic across the tree.
-  const updateBill = (id, patch) =>
-    setBills((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  // Initial hydrate from the API. Single fetch on mount — the API is the
+  // source of truth, mutators just replace single records in local state.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [billsData, settings] = await Promise.all([
+          api.listBills(),
+          api.getSettings(),
+        ]);
+        if (cancelled) return;
+        setBills(billsData);
+        setLockedDeposit(settings.lockedDeposit);
+        setStatus('ready');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.message);
+        setStatus('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const setVariableAmount = (id, monthKey, value) =>
-    setBills((prev) =>
-      prev.map((b) =>
-        b.id === id
-          ? { ...b, variableAmounts: { ...b.variableAmounts, [monthKey]: value } }
-          : b,
-      ),
-    );
+  // Helper: replace one bill in local state with whatever the API returned.
+  // Keeps the "API is truth" rule without needing a full refetch per edit.
+  const replaceBill = (updated) =>
+    setBills((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
 
-  const togglePaid = (id, monthKey) =>
-    setBills((prev) =>
-      prev.map((b) => {
-        if (b.id !== id) return b;
-        const paid = new Set(b.paidMonths || []);
-        paid.has(monthKey) ? paid.delete(monthKey) : paid.add(monthKey);
-        return { ...b, paidMonths: [...paid] };
-      }),
-    );
+  const updateBill = async (id, patch) => replaceBill(await api.updateBill(id, patch));
 
-  const addBill = (bill) =>
-    setBills((prev) => [
-      ...prev,
-      {
-        id: `b-${Date.now()}`,
-        variableAmounts: {},
-        paidMonths: [],
-        ...bill,
-      },
-    ]);
+  const setVariableAmount = async (id, monthKey, value) =>
+    replaceBill(await api.setVariableAmount(id, monthKey, value));
 
-  const removeBill = (id) =>
+  const togglePaid = async (id, monthKey) =>
+    replaceBill(await api.togglePaid(id, monthKey));
+
+  const addBill = async (bill) => {
+    const created = await api.createBill(bill);
+    setBills((prev) => [...prev, created]);
+  };
+
+  const removeBill = async (id) => {
+    await api.deleteBill(id);
     setBills((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const persistLockedDeposit = async (value) => {
+    setLockedDeposit(value); // optimistic — single number, low stakes
+    await api.updateSettings({ lockedDeposit: value });
+  };
 
   return (
     <div className="min-h-screen w-full flex justify-center">
@@ -60,21 +77,23 @@ export default function App() {
       <div className="w-full max-w-md min-h-screen bg-ink-100 relative pb-24">
         <Header tab={tab} />
         <main className="px-4 pt-2">
-          {tab === 'dashboard' && (
+          {status === 'loading' && <LoadingState />}
+          {status === 'error' && <ErrorState message={error} />}
+          {status === 'ready' && tab === 'dashboard' && (
             <Dashboard
               bills={bills}
               lockedDeposit={lockedDeposit}
-              onLockedDepositChange={setLockedDeposit}
+              onLockedDepositChange={persistLockedDeposit}
             />
           )}
-          {tab === 'bills' && (
+          {status === 'ready' && tab === 'bills' && (
             <BillList
               bills={bills}
               onSetVariableAmount={setVariableAmount}
               onTogglePaid={togglePaid}
             />
           )}
-          {tab === 'manage' && (
+          {status === 'ready' && tab === 'manage' && (
             <ManageBills
               bills={bills}
               onAddBill={addBill}
@@ -141,5 +160,28 @@ function BottomNav({ tab, onChange }) {
         })}
       </ul>
     </nav>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="py-16 text-center text-ink-400 text-sm" role="status" aria-live="polite">
+      Loading your bills…
+    </div>
+  );
+}
+
+function ErrorState({ message }) {
+  return (
+    <div
+      className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      role="alert"
+    >
+      <p className="font-semibold">Couldn't reach the bill tracker API.</p>
+      <p className="mt-1 text-red-600/80 break-words">{message}</p>
+      <p className="mt-2 text-xs text-red-600/70">
+        Is the backend container up? Try <code>docker compose up -d</code>.
+      </p>
+    </div>
   );
 }

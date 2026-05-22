@@ -1,5 +1,9 @@
 # Synology / docker-compose deployment for the Household Bill Tracker.
 #
+# Two services:
+#   - bill-tracker-api  : FastAPI + SQLite, persists to the `bill_data` volume.
+#   - bill-tracker      : nginx serving the React SPA + proxying /api/* to the API.
+#
 # Usage on the NAS:
 #   1. SSH in (or use Container Manager's "Project" UI in DSM 7.2+).
 #   2. git clone <your-repo> /volume1/docker/bill-tracker
@@ -10,18 +14,39 @@
 # Synology Photos, Surveillance Station, or another container.
 
 services:
+  bill-tracker-api:
+    build: ./backend
+    image: bill-tracker-api:latest
+    container_name: bill-tracker-api
+    restart: unless-stopped
+    # No host port published — only the nginx frontend talks to it, via
+    # Docker's internal network. Keeps the API off your LAN attack surface.
+    volumes:
+      - bill_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   bill-tracker:
     build: .
     image: bill-tracker:latest
     container_name: bill-tracker
     restart: unless-stopped
+    depends_on:
+      bill-tracker-api:
+        condition: service_healthy
     ports:
       # host:container — only the left side needs editing for your NAS.
       - "8123:80"
-    # No volumes needed — this is a pure static SPA. State lives in the
-    # browser. (Add a volume here later if you wire up persistence.)
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  bill_data:
+    # Named volume so `docker compose down` doesn't nuke your history.
+    # On Synology this lives under /volume1/@docker/volumes/<project>_bill_data.
