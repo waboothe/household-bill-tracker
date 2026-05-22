@@ -4,9 +4,15 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Force a development install so devDependencies (vite, tailwind, postcss…)
+# are present at build time. Some base images / npm versions default to
+# NODE_ENV=production which silently skips them — leading to the classic
+# `sh: vite: not found` faceplant.
+ENV NODE_ENV=development
+
 # Install dependencies first for better Docker layer caching.
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --include=dev --no-audit --no-fund
 
 # Copy source + build static bundle.
 COPY . .
