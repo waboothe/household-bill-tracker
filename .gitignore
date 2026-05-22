@@ -1,5 +1,7 @@
 node_modules
-dist
+# dist is intentionally committed so the NAS can serve the pre-built
+# bundle without needing Node/npm. Rebuild locally with `npm run build`
+# before committing changes.
 .DS_Store
 .vite
 *.log
